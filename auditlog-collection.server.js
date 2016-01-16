@@ -74,10 +74,12 @@ AuditLog.attachSchema(AuditLogSchema);
 // --------------------------------------------------------------------------
 
 AuditLog.assignCallbacks = function(COL, options) {
+  options = options || {};
+  var collectionName = options.name || COL._name || 'unknown';
 
   COL.after.update(function (userId, doc, fieldNames, modifier, options) {
     return AuditLog._update(
-      COL._name,
+      collectionName,
       userId,
       doc,
       this.previous,
@@ -87,10 +89,10 @@ AuditLog.assignCallbacks = function(COL, options) {
     );
   });
   COL.after.remove(function(userId, doc){
-    return AuditLog._remove(COL._name, userId, doc);
+    return AuditLog._remove(collectionName, userId, doc, options);
   });
   COL.after.insert(function(userId, doc) {
-    return AuditLog._insert(COL._name, userId, doc);
+    return AuditLog._insert(collectionName, userId, doc, options);
   });
 };
 
@@ -98,9 +100,9 @@ AuditLog.assignCallbacks = function(COL, options) {
 // -- functions to transform data for AuditLog
 // --------------------------------------------------------------------------
 
-AuditLog._insert = function(collection, userId, doc) {
+AuditLog._insert = function(collection, userId, doc, options) {
   check(collection, String);
-  var r = AuditLog.getDiffOldNew({}, doc);
+  var r = AuditLog.getDiffOldNew({}, doc, options);
   if (!r) return;
   var obj = {
     userId: userId,
@@ -111,9 +113,9 @@ AuditLog._insert = function(collection, userId, doc) {
   };
   AuditLog.insert(obj, {validate: false});
 };
-AuditLog._remove = function(collection, userId, doc) {
+AuditLog._remove = function(collection, userId, doc, options) {
   check(collection, String);
-  var r = AuditLog.getDiffOldNew(doc, {});
+  var r = AuditLog.getDiffOldNew(doc, {}, options);
   if (!r) return;
   var obj = {
     userId: userId,
@@ -125,7 +127,7 @@ AuditLog._remove = function(collection, userId, doc) {
   AuditLog.insert(obj, {validate: false});
 };
 AuditLog._update = function(collection, userId, doc, old, fieldNames, modifier, options) {
-  var r = AuditLog.getDiffOldNew(old, doc);
+  var r = AuditLog.getDiffOldNew(old, doc, options);
   // only logs if something has changed
   if (!r) return;
   //TODO validate is failing for me on result... don't know why
@@ -140,7 +142,17 @@ AuditLog._update = function(collection, userId, doc, old, fieldNames, modifier, 
   };
   AuditLog.insert(obj, {validate: false});
 };
-AuditLog.getDiffOldNew = function(oldDoc, newDoc) {
+AuditLog.getDiffOldNew = function(oldDoc, newDoc, options) {
+  if (options) {
+    if (options.omit) {
+      oldDoc = _.omit(oldDoc, options.omit);
+      newDoc = _.omit(newDoc, options.omit);
+    }
+    if (options.transform && typeof options.transform === "function") {
+      oldDoc = options.transform.bind({isOld: true}, oldDoc)();
+      newDoc = options.transform.bind({isNew: true}, newDoc)();
+    }
+  }
   return Npm.require("deep-diff").diff(oldDoc, newDoc);
 };
 
