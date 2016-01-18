@@ -1,6 +1,6 @@
 Package.describe({
   name: "zeroasterisk:auditlog",
-  version: "0.0.2",
+  version: "0.0.3",
   summary: "Simple, generic, extensible audit logging on collection insert, update, upsert, remove",
   git: "https://github.com/zeroasterisk/meteor-auditlog",
   documentation: "README.md"
